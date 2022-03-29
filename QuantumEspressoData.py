@@ -556,8 +556,10 @@ class QuantumEspressoData:
 
             Parameters
             ----------
-                t : str
-                    Atom/Projection, only one atom and one projection
+                t  : str the specification of the coefficients to take 
+                        Atom/Projections
+                     To add some atoms or projections, add ^
+                        atom1^atom2/5dxy^5dx2-y2  will add the 5dxy and 5dx2-y2 orbitals on atom1 and atom2
                 **kwargs:
                     minEnergy : float
                         The minimum energy of the window for search, default minimum energy of all bands
@@ -583,22 +585,42 @@ class QuantumEspressoData:
             exit()
         t = t.split('/')
 
-        if len(t)!=2:
-            print("You need to specify an atom and a projection. Ex 'Ir_5dxz'")
-            exit()
-        else:
-            ia = self.ProjList[t[0]][t[1]][0]
-            ip = self.ProjList[t[0]][t[1]][1]
-            for ik in range(len(self.k)):
-                am = np.flip(np.argsort(self.ProjBand[:,ik,ia,ip]))                        
-                offdone = 0
-                for ib in am:
-                    if self.bands[ib,ik] < maxEnergy and self.bands[ib,ik] > minEnergy:
-                        if offdone == offset:
+        if len(t)==1:
+            t = t[0].split('^')
+            ip = []
+            for it in t:
+                for p in self.ProjList[it]:
+                    ip.append(self.ProjList[it][p])
+        elif len(t) == 2:
+            ip = []
+            t[0] = t[0].split('^')
+            t[1] = t[1].split('^')
+            for it0 in t[0]:
+                for p in self.ProjList[it0]:
+                    for it in t[1]:
+                        if it in p:
+                            ip.append(self.ProjList[it0][p])
+
+        sumProj = np.zeros((self.nk, self.nbnd), dtype=float)
+        for ik in range(self.nk):
+            for ib in range(self.nbnd):
+                for i in ip:
+                    sumProj[ik, ib] += self.ProjBand[ib, ik, i[0], i[1]]
+
+        for ik in range(self.nk):
+            am = np.flip(np.argsort(sumProj[ik, :]))
+            offdone = 0
+            for ib in am:
+                if self.bands[ib,ik] < maxEnergy and self.bands[ib,ik] > minEnergy :
+                       if offdone == offset:
                             bnd.append(self.bands[ib,ik])
                             break
-                        else:
+                       else:
                             offdone += 1
+                if ib == am[-1]:
+                    print("No projection found with an offset of {:2.0f} at k-point n°{:3.0f}".format(offset, ik))
+                    exit()
+
 
         return np.array(bnd)
     def fit_bands(self, fun, y, nArg, argName):
