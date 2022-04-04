@@ -188,10 +188,14 @@ class RespackData:
             self.WannierCenters = np.zeros((self.nW, 3), dtype=float)
             data = f.readlines()
             M = np.linalg.inv(self.LatticeVectors)
+            print(M)
             for i in range(2,len(data)):
                 R = np.asarray(data[i].split(), dtype=float) / A_TO_BOHR
-                R = np.dot(M,R)
+                print('*'*40)
+                print(R)
+                R = np.dot(np.transpose(M),R)
                 self.WannierCenters[i-2,:] = R
+                print(R)
 
         # Loading the Hamiltonian 
         with open(baseDir+"/dir-wan/dat.h_mat_r") as f:
