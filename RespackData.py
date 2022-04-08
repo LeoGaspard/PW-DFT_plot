@@ -382,7 +382,7 @@ class RespackData:
                             a = int(l[0])-1
                             b = int(l[1])-1
                             val = complex(float(l[2]), float(l[3]))
-                            self.Wmat[iR, a, b] = val
+                            self.Xmat[iR, a, b] = val
                     f.readline()
     def print_parameters(self):
         """
@@ -784,7 +784,7 @@ class RespackData:
         for i in R:
             currR = np.matmul(np.linalg.inv(abc_to_cart), i)
             iR = np.where(np.sum(np.absolute(self.JR-np.asarray(currR,dtype=int)), axis=1) == 0)[0][0]
-            print('R = ({:+3.1f},{:+3.1f},{:+3.1f}) (in xyz) = ({:+1.0f},{:+1.0f},{:+1.0f}) (in abc)'.format(i[0], i[1], i[2], self.R[iR][0], self.R[iR][1], self.R[iR][2]))
+            print('R = ({:+3.1f},{:+3.1f},{:+3.1f}) (in xyz) = ({:+1.0f},{:+1.0f},{:+1.0f}) (in abc)'.format(i[0], i[1], i[2], self.JR[iR][0], self.JR[iR][1], self.JR[iR][2]))
             if orb == 'all':
                 if imag:
                     print("\tREAL PART")
@@ -861,7 +861,7 @@ class RespackData:
         for i in R:
             currR = np.matmul(np.linalg.inv(abc_to_cart), i)
             iR = np.where(np.sum(np.absolute(self.JR-np.asarray(currR,dtype=int)), axis=1) == 0)[0][0]
-            print('R = ({:+3.1f},{:+3.1f},{:+3.1f}) (in xyz) = ({:+1.0f},{:+1.0f},{:+1.0f}) (in abc)'.format(i[0], i[1], i[2], self.R[iR][0], self.R[iR][1], self.R[iR][2]))
+            print('R = ({:+3.1f},{:+3.1f},{:+3.1f}) (in xyz) = ({:+1.0f},{:+1.0f},{:+1.0f}) (in abc)'.format(i[0], i[1], i[2], self.JR[iR][0], self.JR[iR][1], self.JR[iR][2]))
             if orb == 'all':
                 if imag:
                     print("\tREAL PART")
