@@ -113,6 +113,8 @@ class RespackData:
                 Prints the X matrix for a given R vector
             print_V(R, orb='all', imag=False, abc_to_cart=[[1,0,0],[0,1,0],[0,0,1]] 
                 Prints the V matrix for a given R vector
+            print_hopping(threshold=0.0, mode='energy', abc_to_cart=[[1,0,0],[0,1,0],[0,0,1]], orb='all'):
+                Prints the hopping paramaters that satisfy a given condition on a threshold
             get_W(R, orb1, orb2, imag=False, abc_to_cart=[[1,0,0],[0,1,0],[0,0,1]]
                 Returns the value of W between orb1 and orb2 at a given R vector
             get_spread(orb)
@@ -586,9 +588,50 @@ class RespackData:
 
                 X, Y = np.meshgrid(X, Y)
 
-                im = ax[ip,i].pcolormesh(X, Y, Z, **kwargs)
+                if len(ax.shape) == 2:
+                    im = ax[ip,i].pcolormesh(X, Y, Z, **kwargs)
+                else:
+                    im = ax[i].pcolormesh(X, Y, Z, **kwargs)
 
         return im
+    def print_hopping(self, threshold=0.0, mode='energy', abc_to_cart=[[1,0,0],[0,1,0],[0,0,1]], orb='all'):
+        '''
+            Prints the real part of the hopping terms of the hamiltonian
+
+            Parameters
+            ----------
+                mode      : str "energy" or "distance"
+                    The type of threshold, default is energy
+                threshold : float
+                    The value for the threshold, minimum threshold for energy mode,
+                    maximum for distance mode. Default is 0.0
+                abc_to_cart        : 2D list of dimensions 3x3
+                    If you want to specify R in x,y,z and not in a1, a2, a3, this is the matrix that
+                    transforms the vector in the a1, a2, a3 basis to the x, y, z basis
+                orb                : list of string
+                    The list of the names of the Wannier functions to include in the print (default is all)
+        '''
+
+        print("="*TERMINAL_COLUMNS)
+        print(("{:^"+str(TERMINAL_COLUMNS)+"s}").format("HOPPING PARAMETERS"))
+        print("="*TERMINAL_COLUMNS)
+
+        if mode not in ['energy', 'distance']:
+            print("Error : requested mode \"{:s}\" does not exist".format(mode))
+            exit()
+
+        elif mode == 'energy':
+            for ir in range(self.nR):
+                R = self.R[ir]
+                Rcart = np.matmul(abc_to_cart, R)
+                exist = False
+                for ia in range(self.nW-1):
+                    for ib in range(ia, self.nW):
+                        if np.absolute(self.ModelHamiltonian[ir, ia, ib].real) >= threshold and (orb == 'all' or (self.basis[ia] in orb and self.basis[ib] in orb) ):
+                            if not exist:
+                                print("R = ({:+1.0f},{:+1.0f},{:+1.0f}) (in abc) = ({:+4.1f},{:+4.1f},{:+4.1f}) (in xyz)".format(R[0], R[1], R[2], Rcart[0], Rcart[1], Rcart[2]))
+                                exist = True
+                            print("\t{:>10s} --> {:<10s}   :  {:+7.3f}".format(self.basis[ia], self.basis[ib], self.ModelHamiltonian[ir, ia, ib].real))
     def interpolate_bands(self, kpts, **kwargs):
         """
             Interpolates the bandstructure along a given k-path using
@@ -607,6 +650,8 @@ class RespackData:
                         The number of divisions between each high-symmetry k-point, default 30
                     showk       : bool
                         Whether or not to print all the k-points computed, default False
+                    vect        : bool
+                        Wether or not to return the eigenvectors, default False
 
             Returns
             -------
@@ -619,6 +664,7 @@ class RespackData:
         fileName = kwargs.pop('fileName', None)
         div = kwargs.pop('div', 30)
         showk = kwargs.pop("showk", False)
+        vec = kwargs.pop("vect", False)
         nOrb = len(orb)
         kpts = np.array(kpts)
 
@@ -651,6 +697,8 @@ class RespackData:
         H = self.ModelHamiltonian[:,orb,:][:,:,orb]
 
         bands = np.zeros((nK, nOrb))
+        if vec:
+            vectors = np.zeros((nK, nOrb, nOrb), dtype=complex)
 
         newR = np.array([self.__search_R_min(i) for i in self.R])
         for ik in range(nK):
@@ -661,8 +709,10 @@ class RespackData:
             Hk = np.sum(ph[:,None, None] * Ht, axis=0)
             # Make Hk hermitian
             Hk = 1/2 * (Hk + np.conjugate(Hk.transpose()))
-            eigenvals, eigenvec = np.linalg.eig(Hk)
+            eigenvals, eigenvec = np.linalg.eigh(Hk)
             bands[ik, :] = sorted(eigenvals[:].real)
+            if vec:
+                vectors[ik,:,:] = eigenvec[:,:]
             if np.max(eigenvals[:].imag) > 1e-5:
                 loc = np.unravel_index(eigenvals[:].imag.argmax(), eigenvals[:].imag.shape)[0]
                 print("Imaginary part too high for band n°{:2.0f} at k-point n°{:3.0f}: {:16.10f}+i{:16.10f}".format(loc+1, ik+1, eigenvals[loc].real, eigenvals[loc].imag))
@@ -683,7 +733,10 @@ class RespackData:
                         elif s== -1:
                             f.write("{:20.10f}  {:20.10f}\n".format(x[nK-iK-1], bands[nK-iK-1, iW]))
                     s *= -1
-        return x, bands
+        if vec:
+            return x, bands, vectors
+        else:
+            return x, bands, 
     def print_W(self, R, orb='all' ,imag=False, abc_to_cart=[[1,0,0], [0,1,0], [0,0,1]]):
         """
             Prints the W matrix for given R vectors

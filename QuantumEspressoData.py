@@ -67,6 +67,8 @@ class QuantumEspressoData:
             ProjBand      : list of floats , shape (nbnd, nk, nAtom, maxproj)
                 The projections of the wavefunction on the different bands
             ProjList      : dict   { str : { str : tuple of int } }
+            nproj         : int 
+                The number of projections
 
           ++IF pdos.dat.pdos* files
             ProjDOSE      : np.array of floats
@@ -257,6 +259,7 @@ class QuantumEspressoData:
                 print(i)
             exit()
         elif len(f) == 1:
+            self.nproj = 0
             with open(f[0]) as f:
                 data = f.readlines()
                 self.ProjBand = np.zeros((self.nbnd, self.nk, self.nAtom, self.maxproj), float)
@@ -312,6 +315,7 @@ class QuantumEspressoData:
                         ip = 0
                         oldatm = ia
                     prj = prj.lower() + m
+                    self.nproj += 1
                     if atm not in self.ProjList:
                         self.ProjList[atm] = {prj:(ia, ip)}
                     else:
@@ -561,10 +565,12 @@ class QuantumEspressoData:
                      To add some atoms or projections, add ^
                         atom1^atom2/5dxy^5dx2-y2  will add the 5dxy and 5dx2-y2 orbitals on atom1 and atom2
                 **kwargs:
-                    minEnergy : float
-                        The minimum energy of the window for search, default minimum energy of all bands
-                    maxEnergy : float
-                        The maximum energy of the window for search, default minimum energy of all bands
+                    minmax : list of float
+                        The list of separations (between 0 and 1) for the min/max specifications. Default [1.0]
+                    minE   : list of float
+                        The minimum energy of the window for search for all minmax sets, default minimum energy of all bands
+                    maxE   : list of float
+                        The maximum energy of the window for search for all minmax sets, default minimum energy of all bands
                     offset : int
                         The offset (in number of bands). If 1, it will pick the second band with the most t character. Default 0
 
@@ -576,8 +582,9 @@ class QuantumEspressoData:
         if not hasattr(self, "bands"):
             print("No  bands set yet")
             exit()
-        minEnergy = kwargs.pop("minE",np.min(self.bands))
-        maxEnergy = kwargs.pop("maxE",np.max(self.bands))
+        minmax      = kwargs.pop("minmax", [1.0])
+        minEnergies = kwargs.pop("minE",[np.min(self.bands)])
+        maxEnergies = kwargs.pop("maxE",[np.max(self.bands)])
         offset = kwargs.pop("offset", 0)
 
         if not hasattr(self, "ProjList"):
@@ -607,19 +614,26 @@ class QuantumEspressoData:
                 for i in ip:
                     sumProj[ik, ib] += self.ProjBand[ib, ik, i[0], i[1]]
 
+        iener = 0
+        maxEnergy = maxEnergies[iener]
+        minEnergy = minEnergies[iener]
         for ik in range(self.nk):
             am = np.flip(np.argsort(sumProj[ik, :]))
             offdone = 0
+            if self.k[ik] > minmax[iener]:
+                iener += 1
+                maxEnergy = maxEnergies[iener]
+                minEnergy = minEnergies[iener]
             for ib in am:
                 if self.bands[ib,ik] < maxEnergy and self.bands[ib,ik] > minEnergy :
-                       if offdone == offset:
-                            bnd.append(self.bands[ib,ik])
-                            break
-                       else:
-                            offdone += 1
+                    if offdone == offset :
+                        bnd.append(self.bands[ib,ik])
+                        break
+                    else:
+                        offdone += 1
                 if ib == am[-1]:
                     print("No projection found with an offset of {:2.0f} at k-point n°{:3.0f}".format(offset, ik))
-                    exit()
+                    bnd.append(np.nan)
 
 
         return np.array(bnd)
